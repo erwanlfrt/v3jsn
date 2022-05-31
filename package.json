@@ -1,0 +1,23 @@
+{
+  "name": "v3jsn",
+  "version": "0.0.1",
+  "description": "Spatial navigation for Vue 3",
+  "main": "dist/v3jsn.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "/dist"
+  ],
+  "scripts": {
+    "build": "webpack",
+    "serve": "webpack serve --bonjour",
+    "start": "nodemon --exec \"npm run build\" -e ts --ignore dist/"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.16",
+    "npm-run-all": "^4.1.5",
+    "ts-loader": "^9.3.0",
+    "webpack": "^5.72.1",
+    "webpack-cli": "^4.9.2",
+    "webpack-dev-server": "^4.9.0"
+  }
+}
