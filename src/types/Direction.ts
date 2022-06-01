@@ -1,4 +1,4 @@
-export enum KeyMapping {
+export enum Direction {
   LEFT = 37,
   UP = 38,
   RIGHT = 39,
@@ -6,8 +6,8 @@ export enum KeyMapping {
 }
 
 export enum Reverse {
-  LEFT = KeyMapping.RIGHT,
-  RIGHT = KeyMapping.LEFT,
-  UP =  KeyMapping.DOWN,
-  DOWN = KeyMapping.UP
+  LEFT = Direction.RIGHT,
+  RIGHT = Direction.LEFT,
+  UP =  Direction.DOWN,
+  DOWN = Direction.UP
 }
