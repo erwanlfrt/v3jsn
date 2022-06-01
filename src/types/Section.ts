@@ -1,9 +1,14 @@
 import { Configuration } from "./Configuration";
+import { Direction } from "./Direction";
 
 export interface Section {
   id: string,
-  lastFocusedElement: string,
-  previous: string,
   configuration: Configuration,
-  disabled: boolean
+  disabled: boolean,
+  lastFocusedElement?: HTMLElement,
+  previous?: {
+    destination: HTMLElement,
+    reverse: Direction,
+    target: HTMLElement
+  }
 }

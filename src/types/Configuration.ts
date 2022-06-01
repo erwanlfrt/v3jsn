@@ -1,3 +1,4 @@
+
 /**
  * Configuration interface, allows to configure Spatial Navigation behavior in a global or restricted way.
  */
@@ -17,12 +18,8 @@ interface Configuration {
   }
   restrict: string, // 'self-first', 'self-only', 'none'
   tabIndexIgnoreList: string,
-  navigableFilter: any,
-  scrollOptions?: { // scrollIntoViewOptions https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView
-    behavior: string,
-    block: string,
-    inline: string
-  }
+  navigableFilter: null | Function,
+  scrollOptions?: ScrollIntoViewOptions
 }
 
 const defaultConfiguration: Configuration = {
@@ -34,7 +31,7 @@ const defaultConfiguration: Configuration = {
   defaultElement: '',
   enterTo: '',
   leaveFor: {
-    left: '',
+    left : '',
     right: '',
     down: '',
     up: ''
@@ -43,9 +40,9 @@ const defaultConfiguration: Configuration = {
   tabIndexIgnoreList: 'a, input, select, textarea, button, iframe, [contentEditable=true]',
   navigableFilter: null,
   scrollOptions: {
-    behavior: '',
-    block: '',
-    inline: ''
+    behavior: undefined,
+    block: undefined,
+    inline: undefined
   }
 };
 

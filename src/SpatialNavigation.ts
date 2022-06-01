@@ -1,5 +1,6 @@
+import { Core, core } from './Core';
 import { Configuration, defaultConfiguration } from './types/Configuration';
-import { Direction } from './types/Direction';
+import { Direction, directiontoString, StringDirection } from './types/Direction';
 import { Section } from './types/Section';
 
 export class SpatialNavigation {
@@ -14,6 +15,9 @@ export class SpatialNavigation {
   private _duringFocusChange: boolean = false;
   private globalConfiguration: Configuration = defaultConfiguration;
   private _pause: boolean = false;
+  private core: Core = core;
+  private readonly ID_POOL_PREFIX = 'section-'
+  private readonly EVENT_PREFIX = 'sn:';
 
   private constructor () {}
 
@@ -87,7 +91,7 @@ export class SpatialNavigation {
    * @param sectionId - section to configure, undefined to set the global configuration.
    * @param config - configuration
    */
-  public set (sectionId: string | undefined, config: Configuration): boolean | never {
+  public set (sectionId: string, config: Configuration): boolean | never {
     if (!this._sections[sectionId]) {
       throw new Error('Section "' + sectionId + '" doesn\'t exist!');
     }
@@ -122,7 +126,7 @@ export class SpatialNavigation {
   /**
    * Remove a section
    * @param sectionId id of the section to remove
-   * @returns true if section has been removed, false if not
+   * @returns true if section has been removed, false otherwise
    */
   public remove (sectionId: string): boolean {
     if (this._sections[sectionId]) {
@@ -130,7 +134,7 @@ export class SpatialNavigation {
         this._sectionCount--;
       } 
       if (this._lastSectionId === sectionId) {
-        this._lastSectionId = undefined;
+        this._lastSectionId = '';
       }
       return true;
     }
@@ -140,7 +144,7 @@ export class SpatialNavigation {
   /**
    * Disable navigation on a section
    * @param sectionId - id of the section to disable
-   * @returns true if section has been disabled, false if not
+   * @returns true if section has been disabled, false otherwise
    */
   public disable (sectionId: string): boolean {
     if (this._sections[sectionId]) {
@@ -153,7 +157,7 @@ export class SpatialNavigation {
   /**
    * Enable navigation on a section
    * @param sectionId - id of the section to enable
-   * @returns true if section has been enabled, false if not
+   * @returns true if section has been enabled, false otherwise
    */
   public enable (sectionId: string): boolean {
     if (this._sections[sectionId]) {
@@ -182,7 +186,7 @@ export class SpatialNavigation {
    * @param element element to focus (section id or selector), (an element or a section)
    * @param silent ?
    * @param direction incoming direction
-   * @returns true if element has been focused, false if not
+   * @returns true if element has been focused, false otherwise
    */
   public focus (element: string | undefined, silent: boolean, direction: Direction): boolean {
     let result = false;
@@ -204,11 +208,11 @@ export class SpatialNavigation {
    * Move to another element
    */
   public move (direction: Direction, selector: string | undefined): boolean {
-    let element: HTMLElement;
+    let element: HTMLElement | undefined = undefined;
     if (selector) {
-      const elements =  this.parseSelector(selector);
+      const elements =  this.core.parseSelector(selector);
       if (elements.length > 0) {
-        element = this.parseSelector(selector)[0] as HTMLElement;
+        element = this.core.parseSelector(selector)[0] as HTMLElement;
       }
     } else {
       element = this.getCurrentFocusedElement();
@@ -235,6 +239,10 @@ export class SpatialNavigation {
     return this.focusNext(direction, element, sectionId);
   }
 
+  /**
+   * Make a section focusable (more precisely, all its focusable children are made focusable)
+   * @param sectionId id of the section to make focusable, undefined if you want to make all sections focusable
+   */
   public makeFocusable (sectionId: string | undefined): void | never {
     if (sectionId) {
       if (this._sections[sectionId]) {
@@ -250,119 +258,477 @@ export class SpatialNavigation {
     }
   }
 
-  public setDefaultSection (): void {
-
+  /**
+   * Set the default section
+   * @param sectionId id of the section to set as default
+   */
+  public setDefaultSection (sectionId: string): void | never {
+    if (this._sections[sectionId] !== undefined) {
+      this._defaultSectionId = sectionId;
+    } else {
+      throw new Error('Section "' + sectionId + '" doesn\'t exist!');
+    }
   }
-
-
-
 
   // #endregion
 
 
-
-
-
-
   // #region PRIVATE FUNCTIONS
-  
-  private getRect (element) {
 
-  }
-
-  private partition (rects, targetRect, straightOverlapThreshold) {
-
-  }
-
-  private generateDistanceFunction (targetRect) {
-
-  }  
-
-  private prioritize () {
-
-  }
-
-  private navigate (target, direction, candidates, config) {
-
-  }
-
-
+  /**
+   * Generate a unique id for a section
+   * @returns new id section
+   */
   private generateId (): string {
-    return ''
+    let id: string;
+    while(true) {
+      id = this.ID_POOL_PREFIX + String(++this._idPool);
+      if (!this._sections[id]) {
+        break;
+      }
+    }
+    return id;
   }
 
-  private parseSelector (selector): NodeList {
-    return document.querySelectorAll('');
-  }
-
-  private matchSelector (element, selector): boolean {
-    return false;
-  }
-
-  private getCurrentFocusedElement (): HTMLElement{
+  private getCurrentFocusedElement (): HTMLElement | undefined{
     const activeElement = document.activeElement;
     if (activeElement && activeElement !== document.body) {
       return activeElement as HTMLElement;
     }
   }
 
-  private extend (out) {
-
+  private extend(out: any) {
+    out = out || {};
+    for (var i = 1; i < arguments.length; i++) {
+      if (!arguments[i]) {
+        continue;
+      }
+      for (var key in arguments[i]) {
+        if (arguments[i].hasOwnProperty(key) &&
+            arguments[i][key] !== undefined) {
+          out[key] = arguments[i][key];
+        }
+      }
+    }
+    return out;
   }
 
-  private exclude (elemList, excludedeElem) {
-
+  private exclude(elemList: any, excludedElem: any[]) {
+    if (!Array.isArray(excludedElem)) {
+      excludedElem = [excludedElem];
+    }
+    for (var i = 0, index; i < excludedElem.length; i++) {
+      index = elemList.indexOf(excludedElem[i]);
+      if (index >= 0) {
+        elemList.splice(index, 1);
+      }
+    }
+    return elemList;
   }
 
-  private isNavigable (elem, sectionId, verifySectionSelector) {
-
+  /**
+   * Check if an element is navigable
+   * @param elem element to check
+   * @param sectionId id of the element's section
+   * @param verifySectionSelector if true, check the section selector
+   * @returns true if element is navigable, false otherwise
+   */
+  private isNavigable (elem: HTMLElement, sectionId: string, verifySectionSelector: boolean): boolean {
+    if (!elem || !sectionId ||
+      !this._sections[sectionId] || this._sections[sectionId].disabled) {
+      return false;
+    }
+    if ((elem.offsetWidth <= 0 && elem.offsetHeight <= 0) ||
+        elem.hasAttribute('disabled')) {
+      return false;
+    }
+    if (verifySectionSelector && !this.core.matchSelector(elem, this._sections[sectionId].configuration.selector)) {
+      return false;
+    }
+    if (this._sections[sectionId].configuration.navigableFilter !== null) {
+      if (this._sections[sectionId].configuration.navigableFilter!(elem, sectionId) === false) {
+        return false;
+      }
+    } else if (this.globalConfiguration.navigableFilter !== null) {
+      if (this.globalConfiguration.navigableFilter(elem, sectionId) === false) {
+        return false;
+      }
+    }
+    return true;
   }
 
-  private getSectionId (element: HTMLElement): string {
-    return '';
+  /**
+   * Get the element's section id
+   * @param element element
+   * @returns the element's section id
+   */
+  private getSectionId (element: HTMLElement): string | undefined {
+    for (const id in this._sections) {
+      if (!this._sections[id].disabled &&
+          this.core.matchSelector(element, this._sections[id].configuration.selector)) {
+        return id;
+      }
+    }
   }
 
-  private getSectionNavigableElements (sectionId) {
-
+  /**
+   * Get navigable elements into a section
+   * @param sectionId id of the section
+   */
+  private getSectionNavigableElements (sectionId: string): never[] {
+    return this.core.parseSelector(this._sections[sectionId].configuration.selector).filter(element => {
+      return this.isNavigable(element, sectionId, false);
+    });
   }
 
-  private getSectionDefaultElement (sectionId) {
-
+  /**
+   * Get the default element of a section
+   * @param sectionId id of the section
+   * @returns the default element of a section, null if no default element found
+   */
+  private getSectionDefaultElement (sectionId: string): HTMLElement | null {
+    const defaultElement = this._sections[sectionId].configuration.defaultElement;
+    if (!defaultElement) {
+      return null;
+    }
+    const elements = this.core.parseSelector(defaultElement);
+    // check each element to see if it's navigable and stop when one has been found
+    for (const element of elements) {
+      if (this.isNavigable(element, sectionId, true)) {
+        return element as HTMLElement;
+      }
+    }
+    return null;
   }
 
-  private getSectionLastFocusedElement (sectionId) {
-
+  /**
+   * Get the last focused element into a section
+   * @param sectionId id of the section
+   * @returns the last focused element, null if no element found
+   */
+  private getSectionLastFocusedElement (sectionId: any): HTMLElement | null {
+    const lastFocusedElement = this._sections[sectionId].lastFocusedElement;
+    if (lastFocusedElement) {
+      if (!this.isNavigable(lastFocusedElement, sectionId, true)) {
+        return null;
+      }
+      return lastFocusedElement;
+    } else {
+      return null;
+    }
   }
 
-  private fireEvent (elemn, type, details, cancelable): boolean {
+  /**
+   * fire an event
+   * @param element element source
+   * @param type type of event
+   * @param details ?
+   * @param cancelable true if cancelable, false otherwise 
+   * @returns true if event has been successfully dispatched
+   */
+  private fireEvent (element: HTMLElement, type: string, details: any, cancelable?: boolean): boolean {
+    if (arguments.length < 4) {
+      cancelable = true;
+    }
+    const evt = document.createEvent('CustomEvent');
+    evt.initCustomEvent(this.EVENT_PREFIX + type, true, cancelable, details);
+    return element.dispatchEvent(evt);
+  }
+
+  /**
+   * focus and scroll on element
+   * @param element element
+   */
+  private focusNScroll (element: HTMLElement, sectionId: string): void {
+    if (this._sections[sectionId].configuration.scrollOptions !== undefined && this._sections[sectionId].configuration.scrollOptions !== '') {
+      element.focus({ preventScroll: true });
+      element.scrollIntoView(this._sections[sectionId].configuration.scrollOptions);
+    } else if (this.globalConfiguration.scrollOptions !== undefined && this.globalConfiguration.scrollOptions !== '') {
+      element.focus({ preventScroll: true });
+      element.scrollIntoView(this.globalConfiguration.scrollOptions);
+    } else {
+      element.focus();
+    }
+  }
+
+
+  /**
+   * 
+   * @param elem 
+   * @param sectionId 
+   */
+  private focusChanged (element: HTMLElement, sectionId: string) {
+    let id: string | undefined = sectionId;
+    if (!id) {
+      id = this.getSectionId(element);
+    }
+    if (id) {
+      this._sections[sectionId].lastFocusedElement = element;
+      this._lastSectionId = sectionId;
+    }
+  }
+
+  private silentFocus (element: HTMLElement, sectionId: string) {
+    const currentFocusedElement: HTMLElement | undefined = this.getCurrentFocusedElement();
+    if (currentFocusedElement) {
+      currentFocusedElement.blur();
+    }
+    this.focusNScroll(element, sectionId);
+    this.focusChanged(element, sectionId);
+  }
+
+
+  /**
+   * Focus an element
+   * @param elem element to focus
+   * @param sectionId id of the element's section
+   * @param direction source direction
+   */
+  private focusElement (element: HTMLElement, sectionId: string, direction: Direction) {
+    if (!element) {
+      return false;
+    }
+    const currentFocusedElement: HTMLElement | undefined = this.getCurrentFocusedElement();
+
+    if (this._duringFocusChange) {
+      this.silentFocus(element, sectionId);
+      return true;
+    }
+
+    this._duringFocusChange = true;
+
+    if (this._pause) {
+      this.silentFocus(element, sectionId);
+      this._duringFocusChange = false;
+      return true;
+    }
+
+    if (currentFocusedElement) {
+      const unfocusProperties = {
+        nextElement: element,
+        nextSectionId: sectionId,
+        direction: direction,
+        native: false
+      };
+      if (!this.fireEvent(currentFocusedElement, 'willunfocus', unfocusProperties, undefined)) {
+        this._duringFocusChange = false;
+        return false;
+      }
+      currentFocusedElement.blur();
+      this.fireEvent(currentFocusedElement, 'unfocused', unfocusProperties, false);
+    }
+
+    const focusProperties = {
+      previousElement: currentFocusedElement,
+      sectionId: sectionId,
+      direction: direction,
+      native: false
+    };
+    if (!this.fireEvent(element, 'willfocus', focusProperties)) {
+      this._duringFocusChange = false;
+      return false;
+    }
+    this.focusNScroll(element, sectionId);
+    this.fireEvent(element, 'focused', focusProperties, false);
+
+    this._duringFocusChange = false;
+
+    this.focusChanged(element, sectionId);
+    return true;
+  }
+  
+
+  private focusExtendedSelector (selector: string, direction: Direction): boolean {
+    if (selector.charAt(0) == '@') {
+      if (selector.length == 1) {
+        return this.focusSection(undefined, direction);
+      } else {
+        const sectionId = selector.substr(1);
+        return this.focusSection(sectionId, direction);
+      }
+    } else {
+      var next = this.core.parseSelector(selector)[0];
+      if (next) {
+        const nextSectionId = this.getSectionId(next);
+        if (nextSectionId) {
+          if (this.isNavigable(next, nextSectionId, false)) {
+            return this.focusElement(next, nextSectionId, direction);
+          }
+        } else {
+          return false;
+        }
+      }
+    }
     return false;
   }
 
-  private focusElement (elem, sectionId, direction) {
-
+  private addRange (id: string, range: string []) {
+    if (id && range.indexOf(id) < 0 &&
+          this._sections[id] && !this._sections[id].disabled) {
+        range.push(id);
+      }
   }
 
-  private focusChanged (elem, sectionId) {
+  /**
+   * Focus a section
+   * @param sectionId id of the section
+   * @param direction direction
+   * @returns true if section has been focused
+   */
+  private focusSection (sectionId: string | undefined, direction: Direction): boolean {
+    const range: string [] = [];
 
-  }
+    if (sectionId) {
+      this.addRange(sectionId, range);
+    } else {
+      this.addRange(this._defaultSectionId, range);
+      this.addRange(this._lastSectionId, range);
+      for (const section in this._sections) {
+        this.addRange(section, range);
+      }
+    }
 
-  private focusExtendedSelector (selector: string | undefined, direction: Direction): boolean {
+    for (var i = 0; i < range.length; i++) {
+      var id = range[i];
+      var next;
+
+      if (this._sections[id].configuration.enterTo == 'last-focused') {
+        next = this.getSectionLastFocusedElement(id) ||
+               this.getSectionDefaultElement(id) ||
+               this.getSectionNavigableElements(id)[0];
+      } else {
+        next = this.getSectionDefaultElement(id) ||
+               this.getSectionLastFocusedElement(id) ||
+               this.getSectionNavigableElements(id)[0];
+      }
+
+      if (next) {
+        return this.focusElement(next, id, direction);
+      }
+    }
     return false;
   }
 
-  private focusSection (sectionId: string | undefined): boolean{
+  /**
+   * Fire event when navigate has failed
+   * @param element element source
+   * @param direction direction source
+   * @returns true if event has been successfully raised
+   */
+  private fireNavigateFailed (element: HTMLElement, direction: Direction) {
+    return this.fireEvent(element, 'navigatefailed', {
+      direction: direction
+    }, false);
+  }
+
+  private goToLeaveFor (sectionId: string, direction: Direction) {
+    if (this._sections[sectionId].configuration.leaveFor && (this._sections[sectionId].configuration.leaveFor as any)[directiontoString(direction)] !== undefined) {
+      const next = (this._sections[sectionId].configuration.leaveFor as any)[directiontoString(direction)];
+      if (next === '') {
+        return null;
+      }
+      return this.focusExtendedSelector(next, direction);
+    }
     return false;
   }
 
-  private fireNavigateFailed (elem, direction) {
 
-  }
+  /**
+   * Focus next element
+   * @param direction source direction
+   * @param currentFocusedElement current focused element
+   * @param currentSectionId current section id
+   * @returns true if next has been focused successfully
+   */
+  private focusNext (direction: Direction, currentFocusedElement: HTMLElement, currentSectionId: string): boolean {
+      const extSelector = currentFocusedElement.getAttribute('data-sn-' + direction);
+    if (typeof extSelector === 'string') {
+      if (extSelector === '' ||
+          !focusExtendedSelector(extSelector, direction)) {
+        fireNavigatefailed(currentFocusedElement, direction);
+        return false;
+      }
+      return true;
+    }
 
-  private goToLeaveFor (sectionId, direction) {
+    var sectionNavigableElements = {};
+    var allNavigableElements = [];
+    for (var id in _sections) {
+      sectionNavigableElements[id] = getSectionNavigableElements(id);
+      allNavigableElements =
+        allNavigableElements.concat(sectionNavigableElements[id]);
+    }
 
-  }
+    var config = extend({}, GlobalConfig, _sections[currentSectionId]);
+    var next;
 
-  private focusNext (direction, currentFocusedElement, currentSectionId): boolean {
+    if (config.restrict == 'self-only' || config.restrict == 'self-first') {
+      var currentSectionNavigableElements =
+        sectionNavigableElements[currentSectionId];
+
+      next = navigate(
+        currentFocusedElement,
+        direction,
+        exclude(currentSectionNavigableElements, currentFocusedElement),
+        config
+      );
+
+      if (!next && config.restrict == 'self-first') {
+        next = navigate(
+          currentFocusedElement,
+          direction,
+          exclude(allNavigableElements, currentSectionNavigableElements),
+          config
+        );
+      }
+    } else {
+      next = navigate(
+        currentFocusedElement,
+        direction,
+        exclude(allNavigableElements, currentFocusedElement),
+        config
+      );
+    }
+
+    if (next) {
+      _sections[currentSectionId].previous = {
+        target: currentFocusedElement,
+        destination: next,
+        reverse: REVERSE[direction]
+      };
+
+      var nextSectionId = getSectionId(next);
+
+      if (currentSectionId != nextSectionId) {
+        var result = gotoLeaveFor(currentSectionId, direction);
+        if (result) {
+          return true;
+        } else if (result === null) {
+          fireNavigatefailed(currentFocusedElement, direction);
+          return false;
+        }
+
+        var enterToElement;
+        switch (_sections[nextSectionId].enterTo) {
+          case 'last-focused':
+            enterToElement = getSectionLastFocusedElement(nextSectionId) ||
+                             getSectionDefaultElement(nextSectionId);
+            break;
+          case 'default-element':
+            enterToElement = getSectionDefaultElement(nextSectionId);
+            break;
+        }
+        if (enterToElement) {
+          next = enterToElement;
+        }
+      }
+
+      return focusElement(next, nextSectionId, direction);
+    } else if (gotoLeaveFor(currentSectionId, direction)) {
+      return true;
+    }
+
+    fireNavigatefailed(currentFocusedElement, direction);
     return false;
   }
 
