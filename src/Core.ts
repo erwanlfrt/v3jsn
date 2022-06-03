@@ -125,7 +125,7 @@ class Core {
       groups[groupId].push(rect);
 
       if ([0, 2, 6, 8].indexOf(groupId) !== -1) {
-        var threshold = straightOverlapThreshold;
+        const threshold = straightOverlapThreshold;
 
         if (rect.left <= targetRect.right - targetRect.width * threshold) {
           if (groupId === 2) {
@@ -177,10 +177,11 @@ class Core {
     }
 
     const destDistance = destPriority.distance;
+    const target = destPriority.target;
     destPriority.group.sort( (a: ElementRectangle, b: ElementRectangle) => {
       for (let i = 0; i < destDistance.length; i++) {
         const distance = destDistance[i];
-        const delta = distance(a) - distance(b);
+        const delta = distance(a, target) - distance(b, target);
         if (delta) {
           return delta;
         }
@@ -216,8 +217,8 @@ class Core {
     if (!targetRect) return null;
     const targetRectImpl: ElementRectangleImpl = new ElementRectangleImpl(targetRect);
 
-    const groups = this.partition(rects, targetRect, section.configuration.straightOverlapThreshold);
-    const internalGroups = this.partition(groups[4], targetRect.center, section.configuration.straightOverlapThreshold);
+    const groups = this.partition(rects, targetRect, section.configuration.straightOverlapThreshold!);
+    const internalGroups = this.partition(groups[4], targetRect.center, section.configuration.straightOverlapThreshold!);
 
     let priorities: Priority[];
 
@@ -230,14 +231,16 @@ class Core {
             distance: [
               targetRectImpl.nearPlumbLineIsBetter,
               targetRectImpl.topIsBetter
-            ]
+            ],
+            target: targetRectImpl
           },
           {
             group: groups[3],
             distance: [
               targetRectImpl.nearPlumbLineIsBetter,
               targetRectImpl.topIsBetter
-            ]
+            ],
+            target: targetRectImpl
           },
           {
             group: groups[0].concat(groups[6]),
@@ -245,7 +248,8 @@ class Core {
               targetRectImpl.nearHorizonIsBetter,
               targetRectImpl.rightIsBetter,
               targetRectImpl.nearTargetTopIsBetter
-            ]
+            ],
+            target: targetRectImpl
           }
         ];
         break;
@@ -257,14 +261,16 @@ class Core {
             distance: [
               targetRectImpl.nearPlumbLineIsBetter,
               targetRectImpl.topIsBetter
-            ]
+            ],
+            target: targetRectImpl
           },
           {
             group: groups[5],
             distance: [
               targetRectImpl.nearPlumbLineIsBetter,
               targetRectImpl.topIsBetter
-            ]
+            ],
+            target: targetRectImpl
           },
           {
             group: groups[2].concat(groups[8]),
@@ -272,7 +278,8 @@ class Core {
               targetRectImpl.nearHorizonIsBetter,
               targetRectImpl.leftIsBetter,
               targetRectImpl.nearTargetTopIsBetter
-            ]
+            ],
+            target: targetRectImpl
           }
         ];
         break;
@@ -284,14 +291,16 @@ class Core {
             distance: [
               targetRectImpl.nearHorizonIsBetter,
               targetRectImpl.leftIsBetter
-            ]
+            ],
+            target: targetRectImpl
           },
           {
             group: groups[1],
             distance: [
               targetRectImpl.nearHorizonIsBetter,
               targetRectImpl.leftIsBetter
-            ]
+            ],
+            target: targetRectImpl
           },
           {
             group: groups[0].concat(groups[2]),
@@ -299,7 +308,8 @@ class Core {
               targetRectImpl.nearPlumbLineIsBetter,
               targetRectImpl.bottomIsBetter,
               targetRectImpl.nearTargetLeftIsBetter
-            ]
+            ],
+            target: targetRectImpl
           }
         ];
         break;
@@ -311,14 +321,16 @@ class Core {
             distance: [
               targetRectImpl.nearHorizonIsBetter,
               targetRectImpl.leftIsBetter
-            ]
+            ],
+            target: targetRectImpl
           },
           {
             group: groups[7],
             distance: [
               targetRectImpl.nearHorizonIsBetter,
               targetRectImpl.leftIsBetter
-            ]
+            ],
+            target: targetRectImpl
           },
           {
             group: groups[6].concat(groups[8]),
@@ -326,7 +338,8 @@ class Core {
               targetRectImpl.nearPlumbLineIsBetter,
               targetRectImpl.topIsBetter,
               targetRectImpl.nearTargetLeftIsBetter
-            ]
+            ],
+            target: targetRectImpl
           }
         ];
         break;

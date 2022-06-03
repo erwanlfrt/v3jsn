@@ -2,5 +2,6 @@ import { ElementRectangle } from "./ElementRectangle";
 
 export interface Priority {
   group: ElementRectangle[],
-  distance: Function[]
+  distance: Function[],
+  target: ElementRectangle
 }

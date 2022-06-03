@@ -1,11 +1,10 @@
 import { Core, core } from './Core';
 import { Configuration, defaultConfiguration } from './types/Configuration';
-import { Direction, directiontoString, StringDirection } from './types/Direction';
+import { Direction, directiontoString, getReverseDirection, StringDirection } from './types/Direction';
 import { Section } from './types/Section';
 
-export class SpatialNavigation {
+class SpatialNavigation {
   private static instance: SpatialNavigation;
-  
   private _ready: boolean = false;
   private _idPool: number = 0;
   private _sections:  { [key: string]: Section; } = {};
@@ -35,10 +34,10 @@ export class SpatialNavigation {
    */
   public init (): void{
     if (!this._ready) {
-      window.addEventListener('keydown', this.onKeyDown);
-      window.addEventListener('keyup', this.onKeyUp);
-      window.addEventListener('focus', this.onFocus, true);
-      window.addEventListener('blur', this.onBlur, true);
+      window.addEventListener('keydown', this.onKeyDown.bind(this));
+      window.addEventListener('keyup', this.onKeyUp.bind(this));
+      window.addEventListener('focus', this.onFocus.bind(this), true);
+      window.addEventListener('blur', this.onBlur.bind(this), true);
       // document.body.addEventListener('click', onBodyClick);
       this._ready = true;
     }
@@ -91,21 +90,25 @@ export class SpatialNavigation {
    * @param sectionId - section to configure, undefined to set the global configuration.
    * @param config - configuration
    */
-  public set (sectionId: string, config: Configuration): boolean | never {
-    if (!this._sections[sectionId]) {
-      throw new Error('Section "' + sectionId + '" doesn\'t exist!');
-    }
+  public set (sectionId: string | undefined, config: Configuration): boolean | never {
+    let finalConfig = {};
+    Object.assign(finalConfig, this.globalConfiguration);
+    Object.assign(finalConfig, config);
+
     if (sectionId !== undefined) {
-      this._sections[sectionId].configuration = config;
+      if (!this._sections[sectionId]) {
+        throw new Error('Section "' + sectionId + '" doesn\'t exist!');
+      }
+      this._sections[sectionId].configuration = finalConfig as Configuration;
     } else {
-      this.globalConfiguration = config;
+      this.globalConfiguration = finalConfig as Configuration;
     }
     return true;
   }
 
   /**
    * Add a section
-   * @param sectionId - section id to give
+   * @param sectionId - section id to add
    * @param config - configuration of the section
    * @returns sectionId
    */
@@ -115,6 +118,14 @@ export class SpatialNavigation {
     }
     if (this._sections[sectionId]) {
       throw new Error('Section "' + sectionId + '" already exist!');
+    } else {
+      this._sections[sectionId] = {
+        id: sectionId,
+        configuration: defaultConfiguration,
+        disabled: false,
+        lastFocusedElement: undefined,
+        previous: undefined
+      }
     }
     
     if (this.set(sectionId, config)) {
@@ -188,14 +199,14 @@ export class SpatialNavigation {
    * @param direction incoming direction
    * @returns true if element has been focused, false otherwise
    */
-  public focus (element: string | undefined, silent: boolean, direction: Direction): boolean {
+  public focus (element: string, silent: boolean, direction: Direction): boolean {
     let result = false;
     let autoPause = !this._pause && silent;
     if (autoPause) this.pause();
 
     // TO DO - add focusExtendedSelector and focusElement ???
     if (this.isSection(element)) {
-      result = this.focusSection(element);
+      result = this.focusSection(element, direction);
     } else {
       result = this.focusExtendedSelector(element, direction);
     }
@@ -297,27 +308,27 @@ export class SpatialNavigation {
     }
   }
 
-  private extend(out: any) {
+  private extend(out: any, ...args: any) {
     out = out || {};
-    for (var i = 1; i < arguments.length; i++) {
-      if (!arguments[i]) {
+    for (let i = 1; i < args.length; i++) {
+      if (!args[i]) {
         continue;
       }
-      for (var key in arguments[i]) {
-        if (arguments[i].hasOwnProperty(key) &&
-            arguments[i][key] !== undefined) {
-          out[key] = arguments[i][key];
+      for (let key in args[i]) {
+        if (args[i].hasOwnProperty(key) &&
+            args[i][key] !== undefined) {
+          out[key] = args[i][key];
         }
       }
     }
     return out;
   }
 
-  private exclude(elemList: any, excludedElem: any[]) {
+  private exclude(elemList: any, excludedElem: any) {
     if (!Array.isArray(excludedElem)) {
       excludedElem = [excludedElem];
     }
-    for (var i = 0, index; i < excludedElem.length; i++) {
+    for (let i = 0, index; i < excludedElem.length; i++) {
       index = elemList.indexOf(excludedElem[i]);
       if (index >= 0) {
         elemList.splice(index, 1);
@@ -342,7 +353,7 @@ export class SpatialNavigation {
         elem.hasAttribute('disabled')) {
       return false;
     }
-    if (verifySectionSelector && !this.core.matchSelector(elem, this._sections[sectionId].configuration.selector)) {
+    if (verifySectionSelector && !this.core.matchSelector(elem, this._sections[sectionId].configuration.selector!)) {
       return false;
     }
     if (this._sections[sectionId].configuration.navigableFilter !== null) {
@@ -350,7 +361,7 @@ export class SpatialNavigation {
         return false;
       }
     } else if (this.globalConfiguration.navigableFilter !== null) {
-      if (this.globalConfiguration.navigableFilter(elem, sectionId) === false) {
+      if (this.globalConfiguration.navigableFilter!(elem, sectionId) === false) {
         return false;
       }
     }
@@ -364,8 +375,10 @@ export class SpatialNavigation {
    */
   private getSectionId (element: HTMLElement): string | undefined {
     for (const id in this._sections) {
+      // const sectionNavigableElements = this.getSectionNavigableElements(id);
+      // const isChildOfSection = sectionNavigableElements.includes(element as never);
       if (!this._sections[id].disabled &&
-          this.core.matchSelector(element, this._sections[id].configuration.selector)) {
+          this.core.matchSelector(element, this._sections[id].configuration.selector!)) {
         return id;
       }
     }
@@ -376,7 +389,7 @@ export class SpatialNavigation {
    * @param sectionId id of the section
    */
   private getSectionNavigableElements (sectionId: string): never[] {
-    return this.core.parseSelector(this._sections[sectionId].configuration.selector).filter(element => {
+    return this.core.parseSelector(this._sections[sectionId].configuration.selector!).filter(element => {
       return this.isNavigable(element, sectionId, false);
     });
   }
@@ -484,7 +497,7 @@ export class SpatialNavigation {
    * @param sectionId id of the element's section
    * @param direction source direction
    */
-  private focusElement (element: HTMLElement, sectionId: string, direction: Direction) {
+  private focusElement (element: HTMLElement, sectionId: string, direction?: Direction) {
     if (!element) {
       return false;
     }
@@ -547,7 +560,7 @@ export class SpatialNavigation {
         return this.focusSection(sectionId, direction);
       }
     } else {
-      var next = this.core.parseSelector(selector)[0];
+      let next = this.core.parseSelector(selector)[0];
       if (next) {
         const nextSectionId = this.getSectionId(next);
         if (nextSectionId) {
@@ -588,9 +601,9 @@ export class SpatialNavigation {
       }
     }
 
-    for (var i = 0; i < range.length; i++) {
-      var id = range[i];
-      var next;
+    for (let i = 0; i < range.length; i++) {
+      const id = range[i];
+      let next;
 
       if (this._sections[id].configuration.enterTo == 'last-focused') {
         next = this.getSectionLastFocusedElement(id) ||
@@ -641,81 +654,83 @@ export class SpatialNavigation {
    * @returns true if next has been focused successfully
    */
   private focusNext (direction: Direction, currentFocusedElement: HTMLElement, currentSectionId: string): boolean {
-      const extSelector = currentFocusedElement.getAttribute('data-sn-' + direction);
+    const extSelector = currentFocusedElement.getAttribute('data-sn-' + direction);
+
+    // TO DO remove typeof 
     if (typeof extSelector === 'string') {
       if (extSelector === '' ||
-          !focusExtendedSelector(extSelector, direction)) {
-        fireNavigatefailed(currentFocusedElement, direction);
+          !this.focusExtendedSelector(extSelector, direction)) {
+        this.fireNavigateFailed(currentFocusedElement, direction);
         return false;
       }
       return true;
     }
 
-    var sectionNavigableElements = {};
-    var allNavigableElements = [];
-    for (var id in _sections) {
-      sectionNavigableElements[id] = getSectionNavigableElements(id);
-      allNavigableElements =
-        allNavigableElements.concat(sectionNavigableElements[id]);
+    const sectionNavigableElements: any = {};
+    let allNavigableElements: any = [];
+    for (const id in this._sections) {
+      sectionNavigableElements[id] = this.getSectionNavigableElements(id) as HTMLElement[];
+      allNavigableElements = allNavigableElements.concat(sectionNavigableElements[id]);
     }
 
-    var config = extend({}, GlobalConfig, _sections[currentSectionId]);
-    var next;
+    // const config: Configuration = this.extend({}, this.globalConfiguration, this._sections[currentSectionId].configuration);
+    let next: HTMLElement | null;
+    const currentSection = this._sections[currentSectionId];
 
-    if (config.restrict == 'self-only' || config.restrict == 'self-first') {
-      var currentSectionNavigableElements =
+    if (currentSection.configuration.restrict === 'self-only' ||currentSection.configuration.restrict === 'self-first') {
+      const currentSectionNavigableElements =
         sectionNavigableElements[currentSectionId];
 
-      next = navigate(
+      next = this.core.navigate(
         currentFocusedElement,
         direction,
-        exclude(currentSectionNavigableElements, currentFocusedElement),
-        config
+        this.exclude(currentSectionNavigableElements, currentFocusedElement),
+        currentSection
       );
 
-      if (!next && config.restrict == 'self-first') {
-        next = navigate(
+      if (!next && currentSection.configuration.restrict === 'self-first') {
+        next = this.core.navigate(
           currentFocusedElement,
           direction,
-          exclude(allNavigableElements, currentSectionNavigableElements),
-          config
+          this.exclude(allNavigableElements, currentSectionNavigableElements),
+          currentSection
         );
       }
     } else {
-      next = navigate(
+      next = this.core.navigate(
         currentFocusedElement,
         direction,
-        exclude(allNavigableElements, currentFocusedElement),
-        config
+        this.exclude(allNavigableElements, currentFocusedElement),
+        currentSection
       );
     }
 
     if (next) {
-      _sections[currentSectionId].previous = {
+      currentSection.previous = {
         target: currentFocusedElement,
         destination: next,
-        reverse: REVERSE[direction]
+        reverse: getReverseDirection(direction)
       };
 
-      var nextSectionId = getSectionId(next);
+      const nextSectionId: string | undefined = this.getSectionId(next);
 
-      if (currentSectionId != nextSectionId) {
-        var result = gotoLeaveFor(currentSectionId, direction);
+      if (currentSectionId != nextSectionId && nextSectionId !== undefined) {
+        const result: boolean | null = this.goToLeaveFor(currentSectionId, direction);
         if (result) {
           return true;
         } else if (result === null) {
-          fireNavigatefailed(currentFocusedElement, direction);
+          this.fireNavigateFailed(currentFocusedElement, direction);
           return false;
         }
 
-        var enterToElement;
-        switch (_sections[nextSectionId].enterTo) {
+        let enterToElement: HTMLElement | null = null;
+        switch (this._sections[nextSectionId].configuration.enterTo) {
           case 'last-focused':
-            enterToElement = getSectionLastFocusedElement(nextSectionId) ||
-                             getSectionDefaultElement(nextSectionId);
+            enterToElement = this.getSectionLastFocusedElement(nextSectionId) ||
+                             this.getSectionDefaultElement(nextSectionId);
             break;
           case 'default-element':
-            enterToElement = getSectionDefaultElement(nextSectionId);
+            enterToElement = this.getSectionDefaultElement(nextSectionId);
             break;
         }
         if (enterToElement) {
@@ -723,40 +738,157 @@ export class SpatialNavigation {
         }
       }
 
-      return focusElement(next, nextSectionId, direction);
-    } else if (gotoLeaveFor(currentSectionId, direction)) {
+      if (nextSectionId) {
+        return this.focusElement(next, nextSectionId, direction);
+      } else {
+        return false;
+      }
+    } else if (this.goToLeaveFor(currentSectionId, direction)) {
       return true;
     }
-
-    fireNavigatefailed(currentFocusedElement, direction);
+    this.fireNavigateFailed(currentFocusedElement, direction);
     return false;
   }
 
-  private onKeyDown () {
-
+  private preventDefault (evt: Event): boolean {
+    evt.preventDefault();
+    evt.stopPropagation();
+    return false;
   }
 
-  private onKeyUp () {
+  private onKeyDown (evt: KeyboardEvent) {
+    if (!this._sectionCount || this._pause ||
+      evt.altKey || evt.ctrlKey || evt.metaKey || evt.shiftKey) {
+      return;
+    }
 
+    let currentFocusedElement: HTMLElement | null | undefined;
+
+    const direction: Direction = evt.keyCode as unknown as Direction;
+    if (!direction) {
+      if (evt.keyCode == 13) {
+        currentFocusedElement = this.getCurrentFocusedElement();
+        if (currentFocusedElement && this.getSectionId(currentFocusedElement)) {
+          if (!this.fireEvent(currentFocusedElement, 'enter-down', undefined, undefined)) {
+            return this.preventDefault(evt);
+          }
+        }
+      }
+      return;
+    }
+
+    currentFocusedElement = this.getCurrentFocusedElement();
+
+    if (!currentFocusedElement) {
+      if (this._lastSectionId) {
+        currentFocusedElement = this.getSectionLastFocusedElement(this._lastSectionId);
+      }
+      if (!currentFocusedElement) {
+        this.focusSection(undefined, direction);
+        return this.preventDefault(evt);
+      }
+    }
+
+    const currentSectionId = this.getSectionId(currentFocusedElement);
+    if (!currentSectionId) {
+      return;
+    }
+
+    const willmoveProperties = {
+      direction: direction,
+      sectionId: currentSectionId,
+      cause: 'keydown'
+    };
+
+    if (this.fireEvent(currentFocusedElement, 'willmove', willmoveProperties)) {
+      this.focusNext(direction, currentFocusedElement, currentSectionId);
+    }
+
+    return this.preventDefault(evt);
   }
 
-  private onFocus (evt) {
-
+  private onKeyUp (evt: KeyboardEvent): void {
+    if (evt.altKey || evt.ctrlKey || evt.metaKey || evt.shiftKey) {
+      return;
+    }
+    if (!this._pause && this._sectionCount && evt.keyCode == 13) {
+      const currentFocusedElement = this.getCurrentFocusedElement();
+      if (currentFocusedElement && this.getSectionId(currentFocusedElement)) {
+        if (!this.fireEvent(currentFocusedElement, 'enter-up', undefined, undefined)) {
+          evt.preventDefault();
+          evt.stopPropagation();
+        }
+      }
+    }
   }
 
-  private onBlur (evt) {
+  private onFocus (evt: Event): void {
+    const target: EventTarget | null = evt.target;
+    const htmlTarget: HTMLElement = target as HTMLElement;
+    if (target !== window && target !== document &&
+      this._sectionCount && !this._duringFocusChange && target) {
+      const sectionId = this.getSectionId(htmlTarget);
+      if (sectionId) {
+        if (this._pause) {
+          this.focusChanged(htmlTarget, sectionId);
+          return;
+        }
 
+        const focusProperties = {
+          sectionId: sectionId,
+          native: true
+        };
+
+        if (!this.fireEvent(htmlTarget, 'willfocus', focusProperties)) {
+          this._duringFocusChange = true;
+          htmlTarget.blur();
+          this._duringFocusChange = false;
+        } else {
+          this.fireEvent(htmlTarget, 'focused', focusProperties, false);
+          this.focusChanged(htmlTarget, sectionId);
+        }
+      }
+    }
   }
 
-  private isSection (sectionId: string | undefined) {
-    return sectionId in this._sections;
+  private onBlur (evt: Event): void {
+    const target: EventTarget | null = evt.target;
+    const htmlTarget: HTMLElement = target as HTMLElement
+    if (target !== window && target !== document && !this._pause &&
+      this._sectionCount && !this._duringFocusChange && this.getSectionId(htmlTarget)) {
+      const unfocusProperties = {
+        native: true
+      };
+      if (!this.fireEvent(htmlTarget, 'willunfocus', unfocusProperties)) {
+        this._duringFocusChange = true;
+        setTimeout(() => {
+          htmlTarget.focus();
+          this._duringFocusChange = false;
+        });
+      } else {
+        this.fireEvent(htmlTarget, 'unfocused', unfocusProperties, false);
+      }
+    }
+  }
+
+  private isSection (sectionId: string | undefined): boolean {
+    if (sectionId) {
+      return sectionId in this._sections;
+    } else {
+      return false;
+    }
   }
   // TO REMOVE ???
   private onBodyClick () {
-
+    if (this._sections[this._lastSectionId]) {
+      const lastFocusedElement  = this._sections[this._lastSectionId].lastFocusedElement; 
+      if (document.activeElement === document.body && this._lastSectionId 
+        && lastFocusedElement) {
+        this.focusElement(lastFocusedElement, this._lastSectionId, undefined);
+      }
+    }
+    
   }
-
-
 
   /**
    * Make focusable elements of a section.
@@ -767,11 +899,11 @@ export class SpatialNavigation {
     if (configuration.tabIndexIgnoreList !== undefined) {
       tabIndexIgnoreList = configuration.tabIndexIgnoreList;
     } else {
-      tabIndexIgnoreList = this.globalConfiguration.tabIndexIgnoreList;
+      tabIndexIgnoreList = this.globalConfiguration.tabIndexIgnoreList!;
     }
 
-    this.parseSelector(configuration.selector).forEach((element: Node) => {
-      if (!this.matchSelector(element, tabIndexIgnoreList)) {
+    this.core.parseSelector(configuration.selector!).forEach((element: HTMLElement) => {
+      if (!this.core.matchSelector(element, tabIndexIgnoreList)) {
         const htmlElement = element as HTMLElement;
         if (!htmlElement.getAttribute('tabindex')) {
           htmlElement.setAttribute('tabindex', '-1'); // set the tabindex with a negative value. https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/tabindex
@@ -779,13 +911,8 @@ export class SpatialNavigation {
       }
     });
   }
-
-
-
-
-
-
   // #endregion
-
-
 }
+
+const sn = SpatialNavigation.getInstance();
+export { SpatialNavigation, sn}

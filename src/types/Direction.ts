@@ -12,11 +12,16 @@ export enum StringDirection {
   DOWN = 'down'
 }
 
-export enum Reverse {
-  LEFT = Direction.RIGHT,
-  RIGHT = Direction.LEFT,
-  UP =  Direction.DOWN,
-  DOWN = Direction.UP
+export function getReverseDirection(direction: Direction): Direction {
+  if (direction === Direction.LEFT) {
+    return Direction.RIGHT;
+  } else if (direction === Direction.RIGHT) {
+    return Direction.LEFT;
+  } else if (direction === Direction.UP) {
+    return Direction.DOWN;
+  } else {
+    return Direction.UP;
+  }
 }
 
 export function directiontoString (direction: Direction): string {

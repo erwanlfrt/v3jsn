@@ -40,59 +40,59 @@ export class ElementRectangleImpl implements ElementRectangle {
     this.center = rectangle.center;
   }
 
-  public nearPlumbLineIsBetter (targetRect: ElementRectangle): number {
+  public nearPlumbLineIsBetter (rect: ElementRectangle, targetRect: ElementRectangle): number {
     let distance: number;
-    if (this.center.x < targetRect.center.x) {
-      distance = targetRect.center.x - this.right;
+    if (rect.center.x < targetRect.center.x) {
+      distance = targetRect.center.x - rect.right;
     } else {
-      distance = this.left - targetRect.center.x;
+      distance = rect.left - targetRect.center.x;
     }
     return distance < 0 ? 0 : distance;
   }
 
-  public nearHorizonIsBetter (targetRect: ElementRectangle): number {
+  public nearHorizonIsBetter (rect: ElementRectangle, targetRect: ElementRectangle): number {
     let distance: number;
-    if (this.center.y < targetRect.center.y) {
-      distance = targetRect.center.y - this.bottom;
+    if (rect.center.y < targetRect.center.y) {
+      distance = targetRect.center.y - rect.bottom;
     } else {
-      distance = this.top - targetRect.center.y;
+      distance = rect.top - targetRect.center.y;
     }
     return distance < 0 ? 0 : distance;
   }
 
-  public nearTargetLeftIsBetter (targetRect: ElementRectangle): number {
+  public nearTargetLeftIsBetter (rect: ElementRectangle, targetRect: ElementRectangle): number {
     let distance: number;
-    if (this.center.x < targetRect.center.x) {
-      distance = targetRect.left - this.right;
+    if (rect.center.x < targetRect.center.x) {
+      distance = targetRect.left - rect.right;
     } else {
-      distance = this.left - targetRect.left;
+      distance = rect.left - targetRect.left;
     }
     return distance < 0 ? 0 : distance;
   }
 
-  public nearTargetTopIsBetter (targetRect: ElementRectangle): number {
+  public nearTargetTopIsBetter (rect: ElementRectangle, targetRect: ElementRectangle): number {
     let distance: number;
-    if (this.center.y < targetRect.center.y) {
-      distance = targetRect.top - this.bottom;
+    if (rect.center.y < targetRect.center.y) {
+      distance = targetRect.top - rect.bottom;
     } else {
-      distance = this.top - targetRect.top;
+      distance = rect.top - targetRect.top;
     }
     return distance < 0 ? 0 : distance;
   }
 
-  public topIsBetter (): number {
-    return this.top;
+  public topIsBetter (rect: ElementRectangle): number {
+    return rect.top;
   }
 
-  public bottomIsBetter (): number {
-    return -1 * this.bottom;
+  public bottomIsBetter (rect: ElementRectangle): number {
+    return -1 * rect.bottom;
   }
 
-  public leftIsBetter (): number {
-    return this.left;
+  public leftIsBetter (rect: ElementRectangle): number {
+    return rect.left;
   }
 
-  public rightIsBetter (): number {
-    return -1 * this.right;
+  public rightIsBetter (rect: ElementRectangle): number {
+    return -1 * rect.right;
   }
 }
